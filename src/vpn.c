@@ -38,6 +38,8 @@
 
 #include <linux/if_tun.h>
 
+#define tun_read(...) read(__VA_ARGS__)
+#define tun_write(...) write(__VA_ARGS__)
 
 int vpn_tun_alloc(const char *dev) {
   struct ifreq ifr;
