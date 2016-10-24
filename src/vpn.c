@@ -189,10 +189,6 @@ int vpn_run(vpn_ctx_t *ctx) {
   bzero(ctx->tun_buf, SHADOWVPN_ZERO_BYTES);
   bzero(ctx->udp_buf, SHADOWVPN_ZERO_BYTES);
   
-  if (ctx->args->mode == SHADOWVPN_MODE_SERVER && usertoken_len) {
-    ctx->nat_ctx = malloc(sizeof(nat_ctx_t));
-    nat_init(ctx->nat_ctx, ctx->args);
-  }
 
   logf("VPN started");
 
@@ -239,18 +235,7 @@ int vpn_run(vpn_ctx_t *ctx) {
           break;
         }
       }
-      if (usertoken_len) {
-        if (ctx->args->mode == SHADOWVPN_MODE_CLIENT) {
-          memcpy(ctx->tun_buf + SHADOWVPN_ZERO_BYTES,
-                 ctx->args->user_tokens[0], usertoken_len);
-        } else {
-          // do NAT for downstream
-          nat_fix_downstream(ctx->nat_ctx,
-                             ctx->tun_buf + SHADOWVPN_ZERO_BYTES,
-                             r + usertoken_len,
-                             ctx->remote_addrp, &ctx->remote_addrlen);
-        }
-      }
+
       if (ctx->remote_addrlen) {
         crypto_encrypt(ctx->udp_buf, ctx->tun_buf, r + usertoken_len);
 
@@ -311,17 +296,7 @@ int vpn_run(vpn_ctx_t *ctx) {
             memcpy(ctx->remote_addrp, &temp_remote_addr, temp_remote_addrlen);
             ctx->remote_addrlen = temp_remote_addrlen;
           }
-          if (usertoken_len) {
-            if (ctx->args->mode == SHADOWVPN_MODE_SERVER) {
-              // do NAT for upstream
-              if (-1 == nat_fix_upstream(ctx->nat_ctx,
-                                         ctx->tun_buf + SHADOWVPN_ZERO_BYTES,
-                                         r - SHADOWVPN_OVERHEAD_LEN,
-                                         ctx->remote_addrp, ctx->remote_addrlen)) {
-                continue;
-              }
-            }
-          }
+
           if (-1 == tun_write(ctx->tun,
                               ctx->tun_buf + SHADOWVPN_ZERO_BYTES + usertoken_len,
                               r - SHADOWVPN_OVERHEAD_LEN - usertoken_len)) {
