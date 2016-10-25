@@ -237,14 +237,10 @@ int vpn_run(vpn_ctx_t *ctx) {
       }
 
       if (ctx->remote_addrlen) {
-        // crypto_encrypt(ctx->udp_buf, ctx->tun_buf, r + usertoken_len);
 
         // TODO concurrency is currently removed
         int sock_to_send = ctx->socks[0];
 
-        // r = sendto(sock_to_send, ctx->udp_buf + SHADOWVPN_PACKET_OFFSET,
-        //            SHADOWVPN_OVERHEAD_LEN + usertoken_len + r, 0,
-        //            ctx->remote_addrp, ctx->remote_addrlen);
         r = sendto(sock_to_send, ctx->tun_buf + SHADOWVPN_ZERO_BYTES + usertoken_len,
                    r, 0,
                    ctx->remote_addrp, ctx->remote_addrlen);
@@ -269,10 +265,6 @@ int vpn_run(vpn_ctx_t *ctx) {
         // only change remote addr if decryption succeeds
         struct sockaddr_storage temp_remote_addr;
         socklen_t temp_remote_addrlen = sizeof(temp_remote_addr);
-        // r = recvfrom(sock, ctx->udp_buf + SHADOWVPN_PACKET_OFFSET,
-        //             SHADOWVPN_OVERHEAD_LEN + usertoken_len + ctx->args->mtu, 0,
-        //             (struct sockaddr *)&temp_remote_addr,
-        //             &temp_remote_addrlen);
         r = recvfrom(sock, ctx->udp_buf + SHADOWVPN_ZERO_BYTES + usertoken_len,
                     ctx->args->mtu, 0,
                     (struct sockaddr *)&temp_remote_addr,
@@ -293,34 +285,29 @@ int vpn_run(vpn_ctx_t *ctx) {
         if (r == 0)
           continue;
 
-        // if (-1 == crypto_decrypt(ctx->tun_buf, ctx->udp_buf,
-        //                         r - SHADOWVPN_OVERHEAD_LEN)) {
-        //   errf("dropping invalid packet, maybe wrong password");
-        // } else {
-          if (ctx->args->mode == SHADOWVPN_MODE_SERVER) {
-            // if we are running a server, update server address from
-            // recv_from
-            memcpy(ctx->remote_addrp, &temp_remote_addr, temp_remote_addrlen);
-            ctx->remote_addrlen = temp_remote_addrlen;
-          }
+        if (ctx->args->mode == SHADOWVPN_MODE_SERVER) {
+          // if we are running a server, update server address from
+          // recv_from
+          memcpy(ctx->remote_addrp, &temp_remote_addr, temp_remote_addrlen);
+          ctx->remote_addrlen = temp_remote_addrlen;
+        }
 
-          // if (-1 == tun_write(ctx->tun,
-          //                     ctx->tun_buf + SHADOWVPN_ZERO_BYTES + usertoken_len,
-          //                     r - SHADOWVPN_OVERHEAD_LEN - usertoken_len)) {
-          if (-1 == tun_write(ctx->tun,
-                              ctx->udp_buf + SHADOWVPN_ZERO_BYTES + usertoken_len,
-                              r)) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-              // do nothing
-            } else if (errno == EPERM || errno == EINTR || errno == EINVAL) {
-              // just log, do nothing
-              err("write to tun");
-            } else {
-              err("write to tun");
-              break;
-            }
+        // if (-1 == tun_write(ctx->tun,
+        //                     ctx->tun_buf + SHADOWVPN_ZERO_BYTES + usertoken_len,
+        //                     r - SHADOWVPN_OVERHEAD_LEN - usertoken_len)) {
+        if (-1 == tun_write(ctx->tun,
+                            ctx->udp_buf + SHADOWVPN_ZERO_BYTES + usertoken_len,
+                            r)) {
+          if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            // do nothing
+          } else if (errno == EPERM || errno == EINTR || errno == EINVAL) {
+            // just log, do nothing
+            err("write to tun");
+          } else {
+            err("write to tun");
+            break;
           }
-        // }
+        }
       }
     }
   }
