@@ -168,7 +168,6 @@ int vpn_run(vpn_ctx_t *ctx) {
   fd_set readset;
   int max_fd = 0, i;
   ssize_t r;
-  size_t usertoken_len = 0;
   if (ctx->running) {
     errf("can not start, already running");
     return -1;
@@ -178,16 +177,10 @@ int vpn_run(vpn_ctx_t *ctx) {
 
   shell_up(ctx->args);
 
-  if (ctx->args->user_tokens_len) {
-    usertoken_len = SHADOWVPN_USERTOKEN_LEN;
-  }
-
-  ctx->tun_buf = malloc(ctx->args->mtu + SHADOWVPN_ZERO_BYTES +
-                        usertoken_len);
-  ctx->udp_buf = malloc(ctx->args->mtu + SHADOWVPN_ZERO_BYTES +
-                        usertoken_len);
-  bzero(ctx->tun_buf, SHADOWVPN_ZERO_BYTES);
-  bzero(ctx->udp_buf, SHADOWVPN_ZERO_BYTES);
+  ctx->tun_buf = malloc(ctx->args->mtu);
+  ctx->udp_buf = malloc(ctx->args->mtu);
+  bzero(ctx->tun_buf, ctx->args->mtu);
+  bzero(ctx->udp_buf, ctx->args->mtu);
   
 
   logf("VPN started");
@@ -221,9 +214,7 @@ int vpn_run(vpn_ctx_t *ctx) {
     }
 
     if (FD_ISSET(ctx->tun, &readset)) {
-      r = tun_read(ctx->tun,
-                   ctx->tun_buf + SHADOWVPN_ZERO_BYTES + usertoken_len,
-                   ctx->args->mtu);
+      r = tun_read(ctx->tun, ctx->tun_buf, ctx->args->mtu);
       if (r == -1) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
           // do nothing
@@ -241,9 +232,7 @@ int vpn_run(vpn_ctx_t *ctx) {
         // TODO concurrency is currently removed
         int sock_to_send = ctx->socks[0];
 
-        r = sendto(sock_to_send, ctx->tun_buf + SHADOWVPN_ZERO_BYTES + usertoken_len,
-                   r, 0,
-                   ctx->remote_addrp, ctx->remote_addrlen);
+        r = sendto(sock_to_send, ctx->tun_buf, r, 0, ctx->remote_addrp, ctx->remote_addrlen);
         if (r == -1) {
           if (errno == EAGAIN || errno == EWOULDBLOCK) {
             // do nothing
@@ -265,8 +254,7 @@ int vpn_run(vpn_ctx_t *ctx) {
         // only change remote addr if decryption succeeds
         struct sockaddr_storage temp_remote_addr;
         socklen_t temp_remote_addrlen = sizeof(temp_remote_addr);
-        r = recvfrom(sock, ctx->udp_buf + SHADOWVPN_ZERO_BYTES + usertoken_len,
-                    ctx->args->mtu, 0,
+        r = recvfrom(sock, ctx->udp_buf, ctx->args->mtu, 0,
                     (struct sockaddr *)&temp_remote_addr,
                     &temp_remote_addrlen);
         if (r == -1) {
@@ -292,12 +280,7 @@ int vpn_run(vpn_ctx_t *ctx) {
           ctx->remote_addrlen = temp_remote_addrlen;
         }
 
-        // if (-1 == tun_write(ctx->tun,
-        //                     ctx->tun_buf + SHADOWVPN_ZERO_BYTES + usertoken_len,
-        //                     r - SHADOWVPN_OVERHEAD_LEN - usertoken_len)) {
-        if (-1 == tun_write(ctx->tun,
-                            ctx->udp_buf + SHADOWVPN_ZERO_BYTES + usertoken_len,
-                            r)) {
+        if (-1 == tun_write(ctx->tun, ctx->udp_buf, r)) {
           if (errno == EAGAIN || errno == EWOULDBLOCK) {
             // do nothing
           } else if (errno == EPERM || errno == EINTR || errno == EINVAL) {
