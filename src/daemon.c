@@ -76,7 +76,7 @@ int daemon_start(const shadowvpn_args_t *args) {
   signal(SIGHUP, SIG_IGN);
 
   // print on console
-  printf("started\n");
+  printf("started :)\n");
   kill(ppid, SIGINT);
 
   // then rediret stdout & stderr
