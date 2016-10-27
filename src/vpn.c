@@ -281,7 +281,9 @@ int vpn_run(vpn_ctx_t *ctx) {
           // recv_from
           memcpy(ctx->remote_addrp, &temp_remote_addr, temp_remote_addrlen);
           ctx->remote_addrlen = temp_remote_addrlen;
-          printf("remote_addrp now is %s", inet_ntoa(((struct sockaddr_in *)ctx->remote_addrp)->sin_addr));
+
+          struct sockaddr_in* x = (struct sockaddr_in *)ctx->remote_addrp)
+          logf("remote_addrp now is %s:%d", inet_ntoa(x->sin_addr), ntons(x->sin_port);
         }
         logf("Writing to tun %d bytes ...", r);
         if (-1 == tun_write(ctx->tun, ctx->udp_buf, r)) {
