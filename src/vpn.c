@@ -215,6 +215,7 @@ int vpn_run(vpn_ctx_t *ctx) {
 
     if (FD_ISSET(ctx->tun, &readset)) {
       r = tun_read(ctx->tun, ctx->tun_buf, ctx->args->mtu);
+      logf("Read from tun %d bytes", r)
       if (r == -1) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
           // do nothing
@@ -232,6 +233,7 @@ int vpn_run(vpn_ctx_t *ctx) {
         // TODO concurrency is currently removed
         int sock_to_send = ctx->socks[0];
 
+        logf("Writing to UDP %d bytes ...", r)
         r = sendto(sock_to_send, ctx->tun_buf, r, 0, ctx->remote_addrp, ctx->remote_addrlen);
         if (r == -1) {
           if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -257,6 +259,7 @@ int vpn_run(vpn_ctx_t *ctx) {
         r = recvfrom(sock, ctx->udp_buf, ctx->args->mtu, 0,
                     (struct sockaddr *)&temp_remote_addr,
                     &temp_remote_addrlen);
+        logf("Read UDP %d bytes", r)
         if (r == -1) {
           if (errno == EAGAIN || errno == EWOULDBLOCK) {
             // do nothing
@@ -279,7 +282,7 @@ int vpn_run(vpn_ctx_t *ctx) {
           memcpy(ctx->remote_addrp, &temp_remote_addr, temp_remote_addrlen);
           ctx->remote_addrlen = temp_remote_addrlen;
         }
-
+        logf("Writing to tun %d bytes ...", r)
         if (-1 == tun_write(ctx->tun, ctx->udp_buf, r)) {
           if (errno == EAGAIN || errno == EWOULDBLOCK) {
             // do nothing
